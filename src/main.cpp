@@ -3,37 +3,43 @@
 //  created by Frits Jan / productbakery on 11 oktober 2022
 //
 //
-// When working with the squareline editor from lvgl, set the project in squareline to:
-// - Arduino, with TFT_eSPI (which we cannot use, but will replace with LovyanGFX in this main.cpp file)
+// When working with the squareline editor from lvgl, set the project in
+// squareline to:
+// - Arduino, with TFT_eSPI (which we cannot use, but will replace with
+// LovyanGFX in this main.cpp file)
 // - 480 x 320, 16 bit display
-// 
+//
 // Export the template project AND export the UI Files
-// You will get a project directory with two directories inside, 'ui' and 'libraries'
-// From the libraries directory, copy the lv_conf.h to this projects /src/ directory (overwrite the old one)
-// From the ui directory, copy all files to this projects src/ui/ directory (you can empty the ui directory first if needed)
-// The ui.ino file can/should be deleted because this main.cpp files takes over.
+// You will get a project directory with two directories inside, 'ui' and
+// 'libraries' From the libraries directory, copy the lv_conf.h to this projects
+// /src/ directory (overwrite the old one) From the ui directory, copy all files
+// to this projects src/ui/ directory (you can empty the ui directory first if
+// needed) The ui.ino file can/should be deleted because this main.cpp files
+// takes over.
 //
 //*********************************************************************************************************/
 
 #define LGFX_USE_V1
 #include <LovyanGFX.hpp>
+#include <SD.h>
+#include <SPI.h>
+
 
 // SETUP LGFX PARAMETERS FOR WT32-SC01-PLUS
-class LGFX : public lgfx::LGFX_Device
-{
+class LGFX : public lgfx::LGFX_Device {
 
-lgfx::Panel_ST7796      _panel_instance;
-lgfx::Bus_Parallel8     _bus_instance;   
-lgfx::Light_PWM         _light_instance;
-lgfx::Touch_FT5x06      _touch_instance; // FT5206, FT5306, FT5406, FT6206, FT6236, FT6336, FT6436
+  lgfx::Panel_ST7796 _panel_instance;
+  lgfx::Bus_Parallel8 _bus_instance;
+  lgfx::Light_PWM _light_instance;
+  lgfx::Touch_FT5x06
+      _touch_instance; // FT5206, FT5306, FT5406, FT6206, FT6236, FT6336, FT6436
 
 public:
-  LGFX(void)
-  {
-    { 
+  LGFX(void) {
+    {
       auto cfg = _bus_instance.config();
 
-      cfg.freq_write = 20000000;    
+      cfg.freq_write = 20000000;
       cfg.pin_wr = 47; // pin number connecting WR
       cfg.pin_rd = -1; // pin number connecting RD
       cfg.pin_rs = 0;  // Pin number connecting RS(D/C)
@@ -45,20 +51,23 @@ public:
       cfg.pin_d5 = 17; // pin number connecting D5
       cfg.pin_d6 = 16; // pin number connecting D6
       cfg.pin_d7 = 15; // pin number connecting D7
-      //cfg.i2s_port = I2S_NUM_0; // (I2S_NUM_0 or I2S_NUM_1)
+      // cfg.i2s_port = I2S_NUM_0; // (I2S_NUM_0 or I2S_NUM_1)
 
-      _bus_instance.config(cfg);                    // Apply the settings to the bus.
-      _panel_instance.setBus(&_bus_instance);       // Sets the bus to the panel.
+      _bus_instance.config(cfg);              // Apply the settings to the bus.
+      _panel_instance.setBus(&_bus_instance); // Sets the bus to the panel.
     }
 
     { // Set display panel control.
-      auto cfg = _panel_instance.config(); // Get the structure for display panel settings.
+      auto cfg = _panel_instance
+                     .config(); // Get the structure for display panel settings.
 
       cfg.pin_cs = -1;   // Pin number to which CS is connected (-1 = disable)
       cfg.pin_rst = 4;   // pin number where RST is connected (-1 = disable)
       cfg.pin_busy = -1; // pin number to which BUSY is connected (-1 = disable)
 
-      // * The following setting values ​​are set to general default values ​​for each panel, and the pin number (-1 = disable) to which BUSY is connected, so please try commenting out any unknown items.
+      // * The following setting values ​​are set to general default values
+      // ​​for each panel, and the pin number (-1 = disable) to which BUSY
+      // is connected, so please try commenting out any unknown items.
 
       cfg.memory_width = 320;  // Maximum width supported by driver IC
       cfg.memory_height = 480; // Maximum height supported by driver IC
@@ -66,10 +75,10 @@ public:
       cfg.panel_height = 480;  // actual displayable height
       cfg.offset_x = 0;        // Panel offset in X direction
       cfg.offset_y = 0;        // Panel offset in Y direction
-      cfg.offset_rotation = 0;  // was 2
+      cfg.offset_rotation = 0; // was 2
       cfg.dummy_read_pixel = 8;
       cfg.dummy_read_bits = 1;
-      cfg.readable = true;     // was false
+      cfg.readable = true; // was false
       cfg.invert = true;
       cfg.rgb_order = false;
       cfg.dlen_16bit = false;
@@ -79,7 +88,9 @@ public:
     }
 
     { // Set backlight control. (delete if not necessary)
-      auto cfg = _light_instance.config(); // Get the structure for backlight configuration.
+      auto cfg =
+          _light_instance
+              .config(); // Get the structure for backlight configuration.
 
       cfg.pin_bl = 45;     // pin number to which the backlight is connected
       cfg.invert = false;  // true to invert backlight brightness
@@ -87,19 +98,24 @@ public:
       cfg.pwm_channel = 0; // PWM channel number to use (7??)
 
       _light_instance.config(cfg);
-      _panel_instance.setLight(&_light_instance); // Sets the backlight to the panel.
+      _panel_instance.setLight(
+          &_light_instance); // Sets the backlight to the panel.
     }
 
-//*
+    //*
     { // Configure settings for touch screen control. (delete if not necessary)
       auto cfg = _touch_instance.config();
 
-      cfg.x_min = 0;   // Minimum X value (raw value) obtained from the touchscreen
-      cfg.x_max = 319; // Maximum X value (raw value) obtained from the touchscreen
-      cfg.y_min = 0;   // Minimum Y value obtained from touchscreen (raw value)
-      cfg.y_max = 479; // Maximum Y value (raw value) obtained from the touchscreen
+      cfg.x_min =
+          0; // Minimum X value (raw value) obtained from the touchscreen
+      cfg.x_max =
+          319; // Maximum X value (raw value) obtained from the touchscreen
+      cfg.y_min = 0; // Minimum Y value obtained from touchscreen (raw value)
+      cfg.y_max =
+          479; // Maximum Y value (raw value) obtained from the touchscreen
       cfg.pin_int = 7; // pin number to which INT is connected
-      cfg.bus_shared = false; // set true if you are using the same bus as the screen
+      cfg.bus_shared =
+          false; // set true if you are using the same bus as the screen
       cfg.offset_rotation = 0;
 
       // For I2C connection
@@ -110,15 +126,16 @@ public:
       cfg.freq = 400000;   // set I2C clock
 
       _touch_instance.config(cfg);
-      _panel_instance.setTouch(&_touch_instance); // Set the touchscreen to the panel.
+      _panel_instance.setTouch(
+          &_touch_instance); // Set the touchscreen to the panel.
     }
-//*/
+    //*/
     setPanel(&_panel_instance); // Sets the panel to use.
   }
 };
 
-#include <lvgl.h>
 #include "ui/ui.h" // this is the ui generated with lvgl / squareline editor
+#include <lvgl.h>
 
 LGFX tft;
 
@@ -128,10 +145,9 @@ LGFX tft;
 // lv debugging can be set in lv_conf.h
 #if LV_USE_LOG != 0
 /* Serial debugging */
-void my_print(const char * buf)
-{
-    Serial.printf(buf);
-    Serial.flush();
+void my_print(const char *buf) {
+  Serial.printf(buf);
+  Serial.flush();
 }
 #endif
 
@@ -140,7 +156,8 @@ static lv_disp_draw_buf_t draw_buf;
 static lv_color_t buf[screenWidth * 10];
 
 /* Display flushing */
-void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p) {
+void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area,
+                   lv_color_t *color_p) {
   uint32_t w = (area->x2 - area->x1 + 1);
   uint32_t h = (area->y2 - area->y1 + 1);
   tft.startWrite();
@@ -152,37 +169,61 @@ void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color
 
 /*Read the touchpad*/
 void my_touch_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data) {
-    uint16_t touchX, touchY;
-    bool touched = tft.getTouch(&touchX, &touchY);
-    if (!touched) { data->state = LV_INDEV_STATE_REL; }
-    else {
-      data->state = LV_INDEV_STATE_PR;
-      data->point.x = touchX;
-      data->point.y = touchY;
+  uint16_t touchX, touchY;
+  bool touched = tft.getTouch(&touchX, &touchY);
+  if (!touched) {
+    data->state = LV_INDEV_STATE_REL;
+  } else {
+    data->state = LV_INDEV_STATE_PR;
+    data->point.x = touchX;
+    data->point.y = touchY;
 
-      #if DEBUG_TOUCH !=0
-      Serial.print( "Data x " ); Serial.println( touchX );
-      Serial.print( "Data y " ); Serial.println( touchY );
-      #endif
-    }
+#if DEBUG_TOUCH != 0
+    Serial.print("Data x ");
+    Serial.println(touchX);
+    Serial.print("Data y ");
+    Serial.println(touchY);
+#endif
+  }
 }
 
 //************************************************************************************
 //  SETUP AND LOOP
 //************************************************************************************
 
+// SD CARD - SPI PINS
+#define SDSPI_HOST_ID SPI3_HOST
+#define SD_MISO       GPIO_NUM_38
+#define SD_MOSI       GPIO_NUM_40
+#define SD_SCLK       GPIO_NUM_39
+#define SD_CS         GPIO_NUM_41
+
+#define MICRO_SD_IO 41
+
+// SPIClass SPI_SD(FSPI);
+
+
 void setup() {
   Serial.begin(115200);
 
+  // // SPI.begin(SCK, MISO, MOSI, SS);
+  // SPI_SD.begin(_SD_SCLK, _SD_MISO, _SD_MOSI, _SD_CS);
+
+
+  // SD.begin(_SD_CS, SPI_SD , 25000000);
+  SPI.begin(SD_SCLK, SD_MISO, SD_MOSI);
+  SD.begin(SD_CS);
+  #if 1
   tft.begin();
   tft.setRotation(3);
   tft.setBrightness(255);
 
   lv_init();
 
-  #if LV_USE_LOG != 0
-    lv_log_register_print_cb( my_print ); /* register print function for debugging */
-  #endif
+#if LV_USE_LOG != 0
+  lv_log_register_print_cb(
+      my_print); /* register print function for debugging */
+#endif
 
   lv_disp_draw_buf_init(&draw_buf, buf, NULL, screenWidth * 10);
 
@@ -201,10 +242,10 @@ void setup() {
   indev_drv.type = LV_INDEV_TYPE_POINTER;
   indev_drv.read_cb = my_touch_read;
   lv_indev_drv_register(&indev_drv);
-  
+
   // start the UI
   ui_init();
-  
+  #endif
 }
 
 void loop() {

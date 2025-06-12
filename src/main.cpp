@@ -21,9 +21,18 @@
 
 #define LGFX_USE_V1
 #include <LovyanGFX.hpp>
+
+// SD CARD - SPI PINS
+#define SDSPI_HOST_ID SPI3_HOST
+#define SD_MISO GPIO_NUM_38
+#define SD_MOSI GPIO_NUM_40
+#define SD_SCLK GPIO_NUM_39
+#define SD_CS GPIO_NUM_41
+
+#define MICRO_SD_IO 41
+
 #include <SD.h>
 #include <SPI.h>
-
 
 // SETUP LGFX PARAMETERS FOR WT32-SC01-PLUS
 class LGFX : public lgfx::LGFX_Device {
@@ -191,29 +200,28 @@ void my_touch_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data) {
 //  SETUP AND LOOP
 //************************************************************************************
 
-// SD CARD - SPI PINS
-#define SDSPI_HOST_ID SPI3_HOST
-#define SD_MISO       GPIO_NUM_38
-#define SD_MOSI       GPIO_NUM_40
-#define SD_SCLK       GPIO_NUM_39
-#define SD_CS         GPIO_NUM_41
 
-#define MICRO_SD_IO 41
 
-// SPIClass SPI_SD(FSPI);
-
+void readdir(const char *dir) {
+  File root = SD.open(dir);
+  while (true) {
+    File entry = root.openNextFile();
+    if (!entry) {
+      break;
+    }
+    log_i("entry:  %s", entry.name());
+    entry.close();
+  }
+}
 
 void setup() {
   Serial.begin(115200);
 
-  // // SPI.begin(SCK, MISO, MOSI, SS);
-  // SPI_SD.begin(_SD_SCLK, _SD_MISO, _SD_MOSI, _SD_CS);
-
-
-  // SD.begin(_SD_CS, SPI_SD , 25000000);
   SPI.begin(SD_SCLK, SD_MISO, SD_MOSI);
-  SD.begin(SD_CS);
-  #if 1
+  SD.begin(SD_CS, SPI, 25000000);
+  readdir("/");
+
+  log_i("SD numSectors %u sectorSize %u", SD.cardSize(), SD.sectorSize());
   tft.begin();
   tft.setRotation(3);
   tft.setBrightness(255);
@@ -245,7 +253,6 @@ void setup() {
 
   // start the UI
   ui_init();
-  #endif
 }
 
 void loop() {

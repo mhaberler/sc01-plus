@@ -200,8 +200,6 @@ void my_touch_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data) {
 //  SETUP AND LOOP
 //************************************************************************************
 
-
-
 void readdir(const char *dir) {
   File root = SD.open(dir);
   while (true) {
@@ -219,9 +217,9 @@ void setup() {
 
   SPI.begin(SD_SCLK, SD_MISO, SD_MOSI);
   SD.begin(SD_CS, SPI, 25000000);
+  log_i("SD numSectors %u sectorSize %u", SD.numSectors(), SD.sectorSize());
   readdir("/");
 
-  log_i("SD numSectors %u sectorSize %u", SD.cardSize(), SD.sectorSize());
   tft.begin();
   tft.setRotation(3);
   tft.setBrightness(255);

@@ -31,8 +31,9 @@
 
 #define MICRO_SD_IO 41
 
-#include <SD.h>
-#include <SPI.h>
+#include "SD.h"
+#include "USB.h"
+#include "USBMSC.h"
 
 // SETUP LGFX PARAMETERS FOR WT32-SC01-PLUS
 class LGFX : public lgfx::LGFX_Device {
@@ -155,7 +156,7 @@ LGFX tft;
 #if LV_USE_LOG != 0
 /* Serial debugging */
 void my_print(const char *buf) {
-  Serial.printf(buf);
+  log_i(buf);
   Serial.flush();
 }
 #endif
@@ -189,9 +190,9 @@ void my_touch_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data) {
 
 #if DEBUG_TOUCH != 0
     Serial.print("Data x ");
-    Serial.println(touchX);
+    log_i(touchX);
     Serial.print("Data y ");
-    Serial.println(touchY);
+    log_i(touchY);
 #endif
   }
 }
@@ -212,6 +213,77 @@ void readdir(const char *dir) {
   }
 }
 
+USBCDC CDC;
+
+USBMSC MSC;
+static uint32_t DISK_SECTOR_COUNT = 0;
+static uint16_t DISK_SECTOR_SIZE = 0;
+
+static int32_t onWrite(uint32_t lba, uint32_t offset, uint8_t *buffer,
+                       uint32_t bufsize) {
+  // log_i("MSC WRITE: lba: %lu, offset: %lu, bufsize: %lu\n", lba,
+  // offset, bufsize);
+  uint32_t secSize = SD.sectorSize();
+  if (!secSize) {
+    return 0; // disk error
+  }
+  for (int x = 0; x < bufsize / secSize; x++) {
+    uint8_t blkbuffer[secSize];
+    memcpy(blkbuffer, (uint8_t *)buffer + secSize * x, secSize);
+    if (!SD.writeRAW(blkbuffer, lba + x)) {
+      return 0;
+    }
+  }
+  return bufsize;
+}
+
+static int32_t onRead(uint32_t lba, uint32_t offset, void *buffer,
+                      uint32_t bufsize) {
+  // log_i("MSC READ: lba: %lu, offset: %lu, bufsize: %lu\n", lba,
+  // offset, bufsize);
+  uint32_t secSize = SD.sectorSize();
+  if (!secSize) {
+    return false; // disk error
+  }
+  for (int x = 0; x < bufsize / secSize; x++) {
+    if (!SD.readRAW((uint8_t *)buffer + (x * secSize), lba + x)) {
+      return 0; // outside of volume boundary
+    }
+  }
+  return bufsize;
+}
+
+static bool onStartStop(uint8_t power_condition, bool start, bool load_eject) {
+  log_i("MSC START/STOP: power: %u, start: %u, eject: %u\n", power_condition,
+        start, load_eject);
+  return true;
+}
+
+static void usbEventCallback(void *arg, esp_event_base_t event_base,
+                             int32_t event_id, void *event_data) {
+  if (event_base == ARDUINO_USB_EVENTS) {
+    arduino_usb_event_data_t *data = (arduino_usb_event_data_t *)event_data;
+    switch (event_id) {
+    case ARDUINO_USB_STARTED_EVENT:
+      log_i("USB PLUGGED");
+      break;
+    case ARDUINO_USB_STOPPED_EVENT:
+      log_i("USB UNPLUGGED");
+      break;
+    case ARDUINO_USB_SUSPEND_EVENT:
+      log_i("USB SUSPENDED: remote_wakeup_en: %u\n",
+            data->suspend.remote_wakeup_en);
+      break;
+    case ARDUINO_USB_RESUME_EVENT:
+      log_i("USB RESUMED");
+      break;
+
+    default:
+      break;
+    }
+  }
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -219,6 +291,25 @@ void setup() {
   SD.begin(SD_CS, SPI, 25000000);
   log_i("SD numSectors %u sectorSize %u", SD.numSectors(), SD.sectorSize());
   readdir("/");
+
+  USB.onEvent(usbEventCallback);
+  MSC.vendorID("ESP32");      // max 8 chars
+  MSC.productID("USB_MSC");   // max 16 chars
+  MSC.productRevision("1.0"); // max 4 chars
+  MSC.onStartStop(onStartStop);
+  MSC.onRead(onRead);
+  MSC.onWrite(onWrite);
+
+  MSC.mediaPresent(true);
+  // MSC.isWritable(true);  // true if writable, false if read-only
+
+  DISK_SECTOR_COUNT = SD.numSectors();
+  DISK_SECTOR_SIZE = SD.sectorSize();
+
+  MSC.begin(DISK_SECTOR_COUNT, DISK_SECTOR_SIZE);
+  // CDC.begin();
+  // CDC.setDebugOutput(true);
+  USB.begin();
 
   tft.begin();
   tft.setRotation(3);
